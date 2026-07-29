@@ -9,7 +9,7 @@ import com.airlinebooking.booking.payload.request.PassengerRequest;
 import com.airlinebooking.booking.payload.response.BookingResponse;
 import com.airlinebooking.booking.repository.*;
 import com.airlinebooking.booking.service.BookingService;
-import com.airlinebooking.booking.service.FlightService;
+
 import com.airlinebooking.booking.service.RedisService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,12 +17,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.swing.text.html.Option;
+
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+
+import java.util.*;
 
 @Service
 @AllArgsConstructor
@@ -61,6 +59,39 @@ public class BookingServiceImp implements BookingService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public BookingResponse createBooking(BookingRequest bookingRequest, Integer userId) {
+
+        //check ghế trùng trong cùng 1 booking
+        List<String> runSeatNumber = new ArrayList<>();
+        List<String> returnSeatNumber = new ArrayList<>();
+
+        for(PassengerRequest p : bookingRequest.getPassengerRequestList()){
+            if("INFANT".equals(p.getPassengerType())){
+                continue;
+            }
+
+            if(p.getRunSeatNumber() != null){
+                runSeatNumber.add(p.getRunSeatNumber());
+            }
+
+            if(p.getReturnSeatNumber() != null){
+                returnSeatNumber.add(p.getReturnSeatNumber());
+            }
+
+        }
+
+        Set<String> uniqueRunSeatNumber = new HashSet<>(runSeatNumber);
+        if(uniqueRunSeatNumber.size() < runSeatNumber.size() ){
+            throw new AppException(ErrorCode.DUPLICATE_SEAT_IN_REQUEST);
+        }
+
+        Set<String> uniqueReturnSeatNumber = new HashSet<>(returnSeatNumber);
+        if(uniqueReturnSeatNumber.size() < returnSeatNumber.size()){
+            throw new AppException(ErrorCode.DUPLICATE_SEAT_IN_REQUEST);
+
+        }
+
+
+        // nếu có bất kì ghế nào hết hạn hoặc khng chính chủ thì bỏ, unclock hết toàn bộ
         validateAndRollbackSeats(bookingRequest, userId);
 
 
@@ -68,10 +99,13 @@ public class BookingServiceImp implements BookingService {
         extendSeatLock(bookingRequest);
 
         //lấy thông tin chuyến bay ra tuwf db lên có đuược base_price
-        FlightEntity flightRunEntity = flightRepository.findById(bookingRequest.getRunFlightId()).get();
+        FlightEntity flightRunEntity = flightRepository.findById(bookingRequest.getRunFlightId())
+                .orElseThrow(() -> new AppException(ErrorCode.FLIGHT_NOT_FOUND));
+
         FlightEntity flightReturnEntity = null;
         if(bookingRequest.getReturnFlightId() != null){
-            flightReturnEntity = flightRepository.findById(bookingRequest.getReturnFlightId()).get();
+            flightReturnEntity = flightRepository.findById(bookingRequest.getReturnFlightId())
+                    .orElseThrow(() -> new AppException(ErrorCode.FLIGHT_NOT_FOUND));
         }
 
         // Tạo mẫu booking ban đầu trạng thái PENDING
@@ -98,7 +132,7 @@ public class BookingServiceImp implements BookingService {
 
         BookingEntity bookingEntity = bookingEntityOptional.get();
 
-        int unlockSeat = 0;
+
 
         for(PassengerTicketEntity p : bookingEntity.getPassengerTicketEntityList()){
             String seatNumber = p.getSeat().getSeatNumber();
@@ -106,7 +140,7 @@ public class BookingServiceImp implements BookingService {
             boolean isUnlocked = redisService.unlockSeat(p.getSeat().getFlight().getFlightId(), bookingEntity.getUserId(), seatNumber);
 
             if(isUnlocked){
-                ++unlockSeat;
+
                 log.info("Giải phóng ghế {} thành công", seatNumber);
 
 

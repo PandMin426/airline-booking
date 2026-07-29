@@ -15,6 +15,9 @@ import org.springframework.stereotype.Service;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -85,15 +88,23 @@ public class PaymentServiceImp implements PaymentService {
         vnp_Params.put("vnp_IpAddr", ipAddress);    // IP của khách (VNPay lưu để chống rửa tiền/Gian lận)
 
         // Sinh ngày giờ tạo và ngày giờ hết hạn (15 phút)
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));     //khai báo múi giwof VN
-        SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");    // Định dạng chuẩn: NămThángNgàyGiờPhútGiây
-        String vnp_CreateDate = formatter.format(cld.getTime());        // Lấy giờ phút giây hiện tại (Ví dụ: 20260621153000)
+        // khai báo múi giwof việt nam chẩn
+        ZoneId zoneId = ZoneId.of("Asia/Ho_Chi_Minh");
+
+        // 2/ khai báo định dạng chuẩn VNpay
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+
+        // 3/ Sinh ngày giờ tạo
+        LocalDateTime now = LocalDateTime.now(zoneId);
+        String vnp_CreateDate = now.format(formatter);
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
 
-        // Khách chần chừ quá 15 phút, link VNPay bị thiu, Redis nhả ghế -> Quá hợp lý!
-        cld.add(Calendar.MINUTE, 15); // Link này chỉ sống được 15 phút khớp với Redis
-        String vnp_ExpireDate = formatter.format(cld.getTime());
+        // 4/ Sinh ngày giờ hết hạn
+        LocalDateTime expire = now.plusMinutes(15);
+        String vnp_ExpireDate = expire.format(formatter);
         vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
+
+
 
         // 3. Sắp xếp các tham số theo thứ tự Alphabet (Bắt buộc theo chuẩn VNPay) theo A-Z
         List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());

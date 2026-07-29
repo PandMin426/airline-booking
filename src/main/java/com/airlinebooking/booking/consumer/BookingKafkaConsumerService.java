@@ -42,7 +42,7 @@ public class BookingKafkaConsumerService {
 
 
             String customerEmail = bookingService.getEmailByBookingId(event.getBookingId());
-            emailService.sendPaymentSuccessEmail("nguyenhuunhatm@gmail.com", event.getBookingId());
+            emailService.sendPaymentSuccessEmail(customerEmail, event.getBookingId());
 
             log.info("KAFKA CONSUMER: Xử lý thành công cho Booking ID: {}", event.getBookingId());
 

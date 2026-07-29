@@ -21,6 +21,7 @@ public enum ErrorCode {
     BAGGAGE_NOT_FOUND(4007, "Không tìm thấy mức hành lý này trong kho", HttpStatus.NOT_FOUND),
     BOOKING_NOT_FOUND(4008, "Không tìm thấy booking này", HttpStatus.BAD_REQUEST),
     SEAT_HOLD_EXPIRED_OR_INVALID(4009, "Ghế này đã hết hạn hoặc không hợp lệ", HttpStatus.BAD_REQUEST),
+    DUPLICATE_SEAT_IN_REQUEST(40009, "Dữ liệu ghế booking bị trùng", HttpStatus.BAD_REQUEST),
 
     BOOKING_PROCESSING_FAILED(5001, "Lỗi khi tạo mã đặt chỗ, vui lòng thử lại", HttpStatus.INTERNAL_SERVER_ERROR),
     REDIS_OPERATION_FAILED(5002, "Lỗi kết nối Redis khi giữ ghế", HttpStatus.INTERNAL_SERVER_ERROR),

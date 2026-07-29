@@ -8,6 +8,7 @@ import com.airlinebooking.booking.payload.response.SeatResponse;
 import com.airlinebooking.booking.repository.SeatRepository;
 import com.airlinebooking.booking.service.RedisService;
 import com.airlinebooking.booking.service.SeatService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 public class SeatServiceImp implements SeatService {
 
@@ -103,7 +105,7 @@ public class SeatServiceImp implements SeatService {
             if(cachedData != null){
                 seatResponseList = objectMapper.readValue(cachedData, new TypeReference<List<SeatResponse>>() {});
 
-                System.out.println("TRÊN REDIS CÓ, LẤY TỪ ĐÓ XUỐNG");
+                log.info("TRÊN REDIS CÓ, LẤY TỪ ĐÓ XUỐNG");
             } else {
 
                 System.out.println("lấy dưới db");

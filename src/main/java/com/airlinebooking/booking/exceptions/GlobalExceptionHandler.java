@@ -1,6 +1,7 @@
 package com.airlinebooking.booking.exceptions;
 
 import com.airlinebooking.booking.payload.response.BaseResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -31,7 +33,7 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse(ErrorCode.UNCATEGORIZED_EXCEPTION);
 
 
-
+        log.error("Lỗi không xác định (Uncategorized Exception): ", e);
 
 
 
