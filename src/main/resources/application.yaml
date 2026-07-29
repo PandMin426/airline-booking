@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3307/airline_booking
     username: root
-    password: admin123
+    password: ${DB_PASSWORD}
   data:
     redis:
       host: localhost
@@ -29,7 +29,7 @@ spring:
     host: smtp.gmail.com
     port: 587
     username: nguyenhuunhatminh426@gmail.com
-    password: remb hhsu csdf qilu
+    password: ${MAIL_PASSWORD}
     properties:
       mail:
         smtp:
@@ -44,7 +44,7 @@ vnpay:
   tmnCode: R3QI6URI
 
   # Chuỗi bí mật để ký bảo mật (Tuyệt đối không để lộ ra ngoài Frontend)
-  hashSecret: AI2836OAEK7KSGW8EU0SADA2PJ2K0X67
+  hashSecret: ${VNPAY_HASH_SECRET}
 
   # Đường dẫn API của VNPay để mình bắn request sang
   payUrl: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html

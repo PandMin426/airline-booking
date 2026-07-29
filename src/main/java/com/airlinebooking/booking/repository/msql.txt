@@ -1,0 +1,287 @@
+
+DROP DATABASE IF EXISTS airline_booking;
+CREATE DATABASE airline_booking CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE airline_booking;
+
+CREATE TABLE roles (
+    role_id INT AUTO_INCREMENT PRIMARY KEY,
+    role_name VARCHAR(50) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE countries (
+    country_id INT AUTO_INCREMENT PRIMARY KEY,
+    country_code CHAR(2) NOT NULL UNIQUE,
+    country_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE users (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    role_id INT NOT NULL,
+    country_id INT,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    full_name VARCHAR(100),
+    phone_number VARCHAR(20),
+    avatar_url VARCHAR(255),
+    permanently_locked BOOLEAN DEFAULT FALSE,
+    permanently_locked_at TIMESTAMP NULL,
+    status ENUM('ACTIVE', 'PERMANENTLY_LOCKED', 'TEMPORARILY_LOCKED') DEFAULT 'ACTIVE',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE refresh_tokens (
+    token_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token VARCHAR(500) NOT NULL,
+    expiry_date DATETIME NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE airlines (
+    airline_id INT AUTO_INCREMENT PRIMARY KEY,
+    airline_code VARCHAR(10) NOT NULL UNIQUE,
+    airline_name VARCHAR(100) NOT NULL,
+    logo_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE aircrafts (
+    aircraft_id INT AUTO_INCREMENT PRIMARY KEY,
+    airline_id INT NOT NULL,
+    model VARCHAR(100) NOT NULL,
+    registration_number VARCHAR(50) UNIQUE,
+    total_seats INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE airports (
+    airport_code VARCHAR(3) PRIMARY KEY,
+    airport_name VARCHAR(100) NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    country_id INT NOT NULL,
+    timezone VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE flights (
+    flight_id INT AUTO_INCREMENT PRIMARY KEY,
+    flight_number VARCHAR(20) UNIQUE NOT NULL,
+    airline_id INT NOT NULL,
+    aircraft_id INT NOT NULL,
+    departure_airport_code VARCHAR(3) NOT NULL,
+    arrival_airport_code VARCHAR(3) NOT NULL,
+    departure_time DATETIME NOT NULL,
+    arrival_time DATETIME NOT NULL,
+    base_price DECIMAL(12,2) NOT NULL,
+    available_seats INT NOT NULL,
+    status ENUM('SCHEDULED','DELAYED','CANCELLED','COMPLETED') DEFAULT 'SCHEDULED',
+    version BIGINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE seats (
+    seat_id INT AUTO_INCREMENT PRIMARY KEY,
+    flight_id INT NOT NULL,
+    seat_number VARCHAR(10) NOT NULL,
+    seat_class ENUM('ECONOMY','BUSINESS') DEFAULT 'ECONOMY',
+    seat_type ENUM('WINDOW','MIDDLE','AISLE'),
+    price_multiplier DECIMAL(4,2) DEFAULT 1.00,
+    seat_status ENUM('AVAILABLE','HELD','BOOKED') DEFAULT 'AVAILABLE',
+    version BIGINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE(flight_id, seat_number)
+);
+
+CREATE TABLE passengers (
+    passenger_id INT AUTO_INCREMENT PRIMARY KEY,
+    full_name VARCHAR(100) NOT NULL,
+    date_of_birth DATE,
+    gender ENUM('MALE','FEMALE','OTHER'),
+    passenger_type ENUM('ADULT','CHILD','INFANT') DEFAULT 'ADULT',
+    passport_number VARCHAR(50),
+    identity_card VARCHAR(50),
+    country_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE bookings (
+    booking_id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_code VARCHAR(20) UNIQUE NOT NULL,
+    user_id INT NOT NULL,
+    contact_name VARCHAR(100) NOT NULL,
+    contact_email VARCHAR(100) NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL,
+    status ENUM('PENDING','CONFIRMED','CANCELLED') DEFAULT 'PENDING',
+    is_deleted BOOLEAN DEFAULT FALSE,
+    version BIGINT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE passenger_tickets (
+    ticket_id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    passenger_id INT NOT NULL,
+    seat_id INT NOT NULL,
+    ticket_price DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE(seat_id)
+);
+
+CREATE TABLE payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    payment_method ENUM('VNPAY','MOMO','BANK_TRANSFER') DEFAULT 'VNPAY',
+    payment_provider VARCHAR(50),
+    provider_transaction_id VARCHAR(255),
+    amount DECIMAL(12,2) NOT NULL,
+    status ENUM('PENDING','SUCCESS','FAILED') DEFAULT 'PENDING',
+    payment_time DATETIME,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE baggage_catalog (
+    baggage_config_id INT AUTO_INCREMENT PRIMARY KEY,
+    weight_in_kg DECIMAL(5,2) UNIQUE NOT NULL,
+    price DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE ticket_baggages (
+    ticket_baggage_id INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id INT NOT NULL,
+    baggage_config_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE notifications (
+    notification_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE booking_history (
+    history_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    booking_id INT NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE users ADD CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(role_id);
+ALTER TABLE users ADD CONSTRAINT fk_users_country FOREIGN KEY (country_id) REFERENCES countries(country_id);
+ALTER TABLE refresh_tokens ADD CONSTRAINT fk_refresh_tokens_user FOREIGN KEY (user_id) REFERENCES users(user_id);
+ALTER TABLE aircrafts ADD CONSTRAINT fk_aircrafts_airline FOREIGN KEY (airline_id) REFERENCES airlines(airline_id);
+ALTER TABLE airports ADD CONSTRAINT fk_airports_country FOREIGN KEY (country_id) REFERENCES countries(country_id);
+ALTER TABLE flights ADD CONSTRAINT fk_flights_airline FOREIGN KEY (airline_id) REFERENCES airlines(airline_id);
+ALTER TABLE flights ADD CONSTRAINT fk_flights_aircraft FOREIGN KEY (aircraft_id) REFERENCES aircrafts(aircraft_id);
+ALTER TABLE flights ADD CONSTRAINT fk_flights_departure_airport FOREIGN KEY (departure_airport_code) REFERENCES airports(airport_code);
+ALTER TABLE flights ADD CONSTRAINT fk_flights_arrival_airport FOREIGN KEY (arrival_airport_code) REFERENCES airports(airport_code);
+ALTER TABLE seats ADD CONSTRAINT fk_seats_flight FOREIGN KEY (flight_id) REFERENCES flights(flight_id);
+ALTER TABLE passengers ADD CONSTRAINT fk_passengers_country FOREIGN KEY (country_id) REFERENCES countries(country_id);
+ALTER TABLE bookings ADD CONSTRAINT fk_bookings_user FOREIGN KEY (user_id) REFERENCES users(user_id);
+ALTER TABLE passenger_tickets ADD CONSTRAINT fk_ticket_booking FOREIGN KEY (booking_id) REFERENCES bookings(booking_id);
+ALTER TABLE passenger_tickets ADD CONSTRAINT fk_ticket_passenger FOREIGN KEY (passenger_id) REFERENCES passengers(passenger_id);
+ALTER TABLE passenger_tickets ADD CONSTRAINT fk_ticket_seat FOREIGN KEY (seat_id) REFERENCES seats(seat_id);
+ALTER TABLE payments ADD CONSTRAINT fk_payments_booking FOREIGN KEY (booking_id) REFERENCES bookings(booking_id);
+ALTER TABLE ticket_baggages ADD CONSTRAINT fk_ticket_baggages_ticket FOREIGN KEY (ticket_id) REFERENCES passenger_tickets(ticket_id);
+ALTER TABLE ticket_baggages ADD CONSTRAINT fk_ticket_baggages_catalog FOREIGN KEY (baggage_config_id) REFERENCES baggage_catalog(baggage_config_id);
+ALTER TABLE notifications ADD CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users(user_id);
+ALTER TABLE booking_history ADD CONSTRAINT fk_booking_history_booking FOREIGN KEY (booking_id) REFERENCES bookings(booking_id);
+
+CREATE INDEX idx_flights_route ON flights(departure_airport_code, arrival_airport_code);
+CREATE INDEX idx_flights_departure_time ON flights(departure_time);
+CREATE INDEX idx_bookings_user ON bookings(user_id);
+CREATE INDEX idx_payments_booking ON payments(booking_id);
+
+
+-- 1. Thêm Roles và Countries
+INSERT INTO roles (role_name) VALUES ('ROLE_USER'), ('ROLE_ADMIN');
+
+INSERT INTO countries (country_code, country_name) VALUES 
+('VN', 'Vietnam'), ('JP', 'Japan'), ('US', 'United States');
+
+-- 2. Thêm User để test
+INSERT INTO users (role_id, country_id, email, password_hash, first_name, last_name, full_name, phone_number, permanently_locked) VALUES 
+(1, 1, 'testuser@gmail.com', '$2a$12$INSaKRvV2h4XV57WmJT3aOvWhqjv0Cf8pMrCSisGiLOpQ4buweAGC', 'Test', 'Nguyen Van ', 'Nguyen Van Test', '0987654320', 0);
+
+-- 3. Thêm Hãng bay & Máy bay
+INSERT INTO airlines (airline_code, airline_name) VALUES 
+('VNA', 'Vietnam Airlines'), ('VJC', 'Vietjet Air');
+
+INSERT INTO aircrafts (airline_id, model, registration_number, total_seats) VALUES 
+(1, 'Boeing 787', 'VN-A868', 200),
+(2, 'Airbus A321', 'VN-A666', 180);
+
+-- 4. Thêm Sân bay
+INSERT INTO airports (airport_code, airport_name, city, country_id, timezone) VALUES 
+('HAN', 'Noi Bai International', 'Hanoi', 1, 'Asia/Ho_Chi_Minh'),
+('SGN', 'Tan Son Nhat International', 'Ho Chi Minh City', 1, 'Asia/Ho_Chi_Minh'),
+('DAD', 'Da Nang International', 'Da Nang', 1, 'Asia/Ho_Chi_Minh');
+
+-- 5. Thêm Chuyến bay (Bay ngày mai từ HAN đi SGN)
+INSERT INTO flights (flight_number, airline_id, aircraft_id, departure_airport_code, arrival_airport_code, departure_time, arrival_time, base_price, available_seats, status) VALUES 
+('VN123', 1, 1, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 26 HOUR), 1500000.00, 200, 'SCHEDULED'),
+('VJ456', 2, 2, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 74 HOUR), 1200000.00, 180, 'SCHEDULED'),
+('VN201', 1, 1, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 28 HOUR), 1600000.00, 200, 'SCHEDULED'),
+('VN202', 1, 1, 'SGN', 'HAN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 36 HOUR), 1600000.00, 200, 'SCHEDULED'),
+('VN203', 1, 1, 'HAN', 'DAD', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 30 HOUR), 1700000.00, 200, 'SCHEDULED'),
+('VN204', 1, 1, 'DAD', 'HAN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 38 HOUR), 1700000.00, 200, 'SCHEDULED'),
+('VN205', 1, 1, 'SGN', 'DAD', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 32 HOUR), 1800000.00, 200, 'SCHEDULED'),
+('VN206', 1, 1, 'DAD', 'SGN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 40 HOUR), 1800000.00, 200, 'SCHEDULED'),
+('VN207', 1, 1, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 48 HOUR), 1750000.00, 200, 'SCHEDULED'),
+('VN208', 1, 1, 'SGN', 'HAN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 56 HOUR), 1750000.00, 200, 'SCHEDULED'),
+('VN209', 1, 1, 'HAN', 'DAD', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 54 HOUR), 1900000.00, 200, 'SCHEDULED'),
+('VN210', 1, 1, 'DAD', 'HAN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 62 HOUR), 1900000.00, 200, 'SCHEDULED'),
+('VN211', 1, 1, 'SGN', 'DAD', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 66 HOUR), 1850000.00, 200, 'SCHEDULED'),
+('VN212', 1, 1, 'DAD', 'SGN', DATE_ADD(NOW(), INTERVAL 1 DAY), DATE_ADD(NOW(), INTERVAL 74 HOUR), 1850000.00, 200, 'SCHEDULED'),
+('VJ501', 2, 2, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 28 HOUR), 1400000.00, 180, 'SCHEDULED'),
+('VJ502', 2, 2, 'SGN', 'HAN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 36 HOUR), 1400000.00, 180, 'SCHEDULED'),
+('VJ503', 2, 2, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 30 HOUR), 1500000.00, 180, 'SCHEDULED'),
+('VJ504', 2, 2, 'DAD', 'HAN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 38 HOUR), 1500000.00, 180, 'SCHEDULED'),
+('VJ505', 2, 2, 'SGN', 'DAD', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 32 HOUR), 1550000.00, 180, 'SCHEDULED'),
+('VJ506', 2, 2, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 40 HOUR), 1550000.00, 180, 'SCHEDULED'),
+('VJ507', 2, 2, 'HAN', 'SGN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 48 HOUR), 1600000.00, 180, 'SCHEDULED'),
+('VJ508', 2, 2, 'SGN', 'HAN', DATE_ADD(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 56 HOUR), 1600000.00, 180, 'SCHEDULED');
+
+
+-- 6. Thêm Ghế ngồi (Mock vài ghế cho chuyến bay 1)
+-- Các ghế: 1A, 1B (Thương gia) | 10A, 10B, 10C (Phổ thông)
+INSERT INTO seats (flight_id, seat_number, seat_class, seat_type, price_multiplier, seat_status) VALUES 
+(1, '1A', 'BUSINESS', 'WINDOW', 2.50, 'AVAILABLE'),
+(1, '1B', 'BUSINESS', 'AISLE', 2.50, 'AVAILABLE'),
+(1, '10A', 'ECONOMY', 'WINDOW', 1.20, 'AVAILABLE'),
+(1, '10B', 'ECONOMY', 'MIDDLE', 1.00, 'AVAILABLE'),
+(1, '10C', 'ECONOMY', 'AISLE', 1.00, 'AVAILABLE'),
+(2, '1A', 'BUSINESS', 'WINDOW', 2.50, 'AVAILABLE'),
+(2, '1B', 'BUSINESS', 'AISLE', 2.50, 'AVAILABLE'),
+(2, '5A', 'ECONOMY', 'WINDOW', 1.20, 'AVAILABLE'),  -- Ghế chiều về của NGUYEN VAN TEST
+(2, '5B', 'ECONOMY', 'MIDDLE', 1.00, 'AVAILABLE'),  -- Ghế chiều về của TRAN THI B
+(2, '5C', 'ECONOMY', 'AISLE', 1.00, 'AVAILABLE');
+
+-- 7. Thêm Bảng giá hành lý
+INSERT INTO baggage_catalog (weight_in_kg, price) VALUES 
+(0.00, 0.00),         -- Không mang thêm (Miễn phí)
+(15.00, 250000.00),   -- 15kg
+(20.00, 350000.00),   -- 20kg
+(30.00, 500000.00);   -- 30kg
