@@ -20,7 +20,7 @@ public class BookingController {
     @PostMapping("/create")
     public ResponseEntity<?> createBooking(@Valid @RequestBody BookingRequest request){
         //gán cứng userId = 1 trước đẻ test
-        Integer curUserId = 2;
+        Integer curUserId = 1;
 
 
         BaseResponse baseResponse = new BaseResponse();

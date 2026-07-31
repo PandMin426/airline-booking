@@ -14,6 +14,7 @@ import com.airlinebooking.booking.service.RedisService;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +55,9 @@ public class BookingServiceImp implements BookingService {
 
     @Autowired
     private BookingMapper bookingMapper;
+
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
 
     @Transactional(rollbackFor = Exception.class)
@@ -108,11 +112,28 @@ public class BookingServiceImp implements BookingService {
                     .orElseThrow(() -> new AppException(ErrorCode.FLIGHT_NOT_FOUND));
         }
 
+        // Lấy ghế đang bị held trên redis chiều đi
+        List<String> heldRunSeats = getHeldSeatsFromRedis(bookingRequest.getRunFlightId());
+        if(heldRunSeats.isEmpty()) {
+            heldRunSeats.add("DUMMY_SEAT_TO_AVOID_SQL_ERROR");
+        }
+
+        // Lấy ghế đang bị held trên redis chiều về
+        List<String> heldReturnSeats = new ArrayList<>();
+        if(bookingRequest.getReturnFlightId() != null){
+            heldReturnSeats = getHeldSeatsFromRedis(bookingRequest.getReturnFlightId());
+
+            if(heldReturnSeats.isEmpty()) {
+                heldReturnSeats.add("DUMMY_SEAT_TO_AVOID_SQL_ERROR");
+            }
+        }
+
         // Tạo mẫu booking ban đầu trạng thái PENDING
         BookingEntity bookingEntity = initPendingBooking(bookingRequest, userId);
 
         //xử lý thông tin hành khách (lưu thông tin hành khách xuống db + tính tổng tiền tất cả)
-        BigDecimal totalAmoutAllPassenger = processAllPassenger(bookingRequest, bookingEntity, flightRunEntity, flightReturnEntity);
+        BigDecimal totalAmoutAllPassenger = processAllPassenger(bookingRequest, bookingEntity, flightRunEntity, flightReturnEntity,
+                                                                heldRunSeats, heldReturnSeats);
 
         // set giá tiền
         bookingEntity.setTotalAmount(totalAmoutAllPassenger);
@@ -122,29 +143,41 @@ public class BookingServiceImp implements BookingService {
         return bookingMapper.toResponse(bookingRepository.save(bookingEntity)) ;
     }
 
+    @Transactional
     @Override
     public void unlockSeatsByBookingId(Integer bookingId) {
-        Optional<BookingEntity> bookingEntityOptional = bookingRepository.findByIdWithTickets(bookingId);
+        BookingEntity bookingEntity = bookingRepository.findByIdWithTickets(bookingId)
+                .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_FOUND));
 
-        if(!bookingEntityOptional.isPresent()){
-            throw  new AppException(ErrorCode.BOOKING_NOT_FOUND);
-        }
 
-        BookingEntity bookingEntity = bookingEntityOptional.get();
 
 
 
         for(PassengerTicketEntity p : bookingEntity.getPassengerTicketEntityList()){
-            String seatNumber = p.getSeat().getSeatNumber();
 
-            boolean isUnlocked = redisService.unlockSeat(p.getSeat().getFlight().getFlightId(), bookingEntity.getUserId(), seatNumber);
+            SeatEntity seat = p.getSeat();
+            String seatNumber = seat.getSeatNumber();
+            Integer flightId = seat.getFlight().getFlightId();
 
-            if(isUnlocked){
+            // Nhả ghế trên redis
+            boolean isUnlocked = redisService.unlockSeat(flightId, bookingEntity.getUserId(), seatNumber);
 
-                log.info("Giải phóng ghế {} thành công", seatNumber);
+            int changeRows = seatRepository.releaseSeat(seat.getSeatId());
+
+            if(isUnlocked && changeRows != 0){
+
+                log.info("Giải phóng ghế {} thành công (xóa redis & update db)", seatNumber);
 
 
             }
+        }
+
+
+        // 3. [THÊM MỚI] Xóa Cache tĩnh sơ đồ ghế của chuyến bay này (để client gọi API map thấy ghế đã trống lại)
+        // Giả sử key cache sơ đồ ghế của bạn là "seatmap:flight:{flightId}" (bạn tự chỉnh theo thực tế)
+        if (!bookingEntity.getPassengerTicketEntityList().isEmpty()) {
+            Integer flightId = bookingEntity.getPassengerTicketEntityList().get(0).getSeat().getFlight().getFlightId();
+            stringRedisTemplate.delete("booking:flight:" + flightId + ":static_seatmap");
         }
 
 
@@ -182,6 +215,9 @@ public class BookingServiceImp implements BookingService {
             // 1. KIỂM TRA CHIỀU ĐI
             String runSeat = pRequest.getRunSeatNumber();
             if (runSeat != null && !runSeat.trim().isEmpty()) {
+                log.warn("Lỗi ở đây 1", runSeat);
+
+
                 if (!redisService.isSeatHoldByCurrentUser(request.getRunFlightId(), userId, runSeat)) {
 
                     log.warn("Lỗi ghế {} chiều đi. Đang Rollback toàn bộ request", runSeat);
@@ -266,7 +302,8 @@ public class BookingServiceImp implements BookingService {
     }
 
     //xử lý tính tổng + lưu thông tin passenger
-    private BigDecimal processAllPassenger(BookingRequest request, BookingEntity bookingEntity, FlightEntity runFlightEntity, FlightEntity returnFlightEntity){
+    private BigDecimal processAllPassenger(BookingRequest request, BookingEntity bookingEntity, FlightEntity runFlightEntity, FlightEntity returnFlightEntity,
+                                            List<String> runHeldSeats, List<String> returnHeldSeats){
         BigDecimal totalAmount = BigDecimal.ZERO;
 
         for(PassengerRequest pRequest : request.getPassengerRequestList()){
@@ -279,7 +316,7 @@ public class BookingServiceImp implements BookingService {
             }
 
             //tính tổng tiền của 1 người cả chiềuddisi và chiều về(nếu có) và cộng tổng vào
-            totalAmount = totalAmount.add(calculateTotalTicketPasssenger(bookingEntity, runFlightEntity, returnFlightEntity, pRequest,passengerEntity));
+            totalAmount = totalAmount.add(calculateTotalTicketPasssenger(bookingEntity, runFlightEntity, returnFlightEntity, pRequest,passengerEntity, runHeldSeats, returnHeldSeats));
 
 
 
@@ -302,15 +339,18 @@ public class BookingServiceImp implements BookingService {
 
     }
 
-    private BigDecimal calculateTotalTicketPasssenger(BookingEntity booking, FlightEntity runFlightEntity, FlightEntity returnFlightEntity, PassengerRequest passengerRequest, PassengerEntity passenger){
+    private BigDecimal calculateTotalTicketPasssenger(BookingEntity booking, FlightEntity runFlightEntity, FlightEntity returnFlightEntity, PassengerRequest passengerRequest, PassengerEntity passenger,
+                                                        List<String> runHeldSeats, List<String> returnHeldSeats){
         BigDecimal totalPricePassenger = BigDecimal.ZERO;
 
         //tính tiền chiều đi
-        totalPricePassenger = totalPricePassenger.add(calculateTicket(booking, runFlightEntity, passengerRequest.getRunSeatNumber(), passengerRequest.getRunBaggageId(), passenger));
+        totalPricePassenger = totalPricePassenger.add(calculateTicket(booking, runFlightEntity, passengerRequest.getRunSeatNumber(), passengerRequest.getRunBaggageId(), passenger,
+                                                                        runHeldSeats));
 
         //tính tiền chiều về nễu có
         if(returnFlightEntity != null){
-            totalPricePassenger = totalPricePassenger.add(calculateTicket(booking, returnFlightEntity, passengerRequest.getReturnSeatNumber(), passengerRequest.getReturnBaggageId(), passenger));
+            totalPricePassenger = totalPricePassenger.add(calculateTicket(booking, returnFlightEntity, passengerRequest.getReturnSeatNumber(), passengerRequest.getReturnBaggageId(), passenger,
+                                                                        returnHeldSeats));
 
         }
 
@@ -320,7 +360,7 @@ public class BookingServiceImp implements BookingService {
     }
 
 
-    private BigDecimal calculateTicket(BookingEntity booking, FlightEntity flight, String seatNumber, Integer baggageId, PassengerEntity passenger) {
+    private BigDecimal calculateTicket(BookingEntity booking, FlightEntity flight, String seatNumber, Integer baggageId, PassengerEntity passenger, List<String> heldSeats) {
 
         SeatEntity seat = new SeatEntity();
 
@@ -328,28 +368,26 @@ public class BookingServiceImp implements BookingService {
 
         // th1: khách chủ động chọn ghế thì sẽ có giá khác
         if(seatNumber != null && !seatNumber.trim().isEmpty()){ // ở đây check truyền vào có null và có phải toàn dấu cách không
-            Optional<SeatEntity> seatEntity = seatRepository.findByFlightIdAndSeatNumber(flight.getFlightId(), seatNumber);
-
-            if(!seatEntity.isPresent()){
-                throw new AppException(ErrorCode.SEAT_NOT_FOUND);
-            }
+            seat = seatRepository.findByFlightIdAndSeatNumber(flight.getFlightId(), seatNumber)
+                    .orElseThrow(() -> new AppException(ErrorCode.SEAT_NOT_FOUND));
 
             //tính giá vé thật
-            ticketPrice = ticketPrice.multiply(seatEntity.get().getPriceMultiplier());
-
-            seat = seatEntity.get();
-
+            ticketPrice = ticketPrice.multiply(seat.getPriceMultiplier());
 
         } else {// th2: là bỏ qua và không chọn ghế thì sẽ lấy giá Mặc định chuyens bay đó và vị trí ghees random theo hạng ghế thấp đến cao
-            Optional<SeatEntity> seatRandomEntity = seatRepository.findRandomSeat(flight.getFlightId());
+            seat = seatRepository.findRandomSeat(flight.getFlightId(), heldSeats)
+                    .orElseThrow(() -> new AppException(ErrorCode.SEAT_NOT_FOUND));
 
-            if(!seatRandomEntity.isPresent()){
-                throw new AppException(ErrorCode.SEAT_NOT_FOUND);
-            }
+        }
 
-            seat = seatRandomEntity.get();
+        log.info("không lỗi 1");
+        // chặn tránh race condition tại db
+        int updateRows = seatRepository.bookSeatIfAvailable(seat.getSeatId());
 
+        log.info("không lỗi 2 ");
 
+        if(updateRows == 0){
+            throw new AppException(ErrorCode.SEAT_ALREADY_LOCKED);
         }
 
         // đến bước coi hành lý giá bao hiêu để cộng gi tiền vào
@@ -385,6 +423,23 @@ public class BookingServiceImp implements BookingService {
 
 
         return ticketPrice;
+    }
+
+    private List<String> getHeldSeatsFromRedis(Integer flightId) {
+        // Tìm tất cả các key đang giữ ghế của chuyến bay này
+        String pattern = "booking:flight:" + flightId + ":seat:*";
+        Set<String> keys = redisService.scanKeys(pattern);
+
+        List<String> heldSeats = new ArrayList<>();
+        if (keys != null && !keys.isEmpty()) {
+            for (String key : keys) {
+                // Cắt chuỗi để lấy ra seatNumber ở cuối.
+                // Vd: "booking:flight:1:seat:12A" -> Tách theo ":" rồi lấy phần tử cuối là "12A"
+                String[] parts = key.split(":");
+                heldSeats.add(parts[parts.length - 1]);
+            }
+        }
+        return heldSeats;
     }
 
 

@@ -41,7 +41,7 @@ spring:
 # VNPAY CONFIGURATION
 vnpay:
   # Mã website của bạn trên hệ thống VNPay (Terminal ID)
-  tmnCode: R3QI6URI
+  tmnCode: D9XR1AMD
 
   # Chuỗi bí mật để ký bảo mật (Tuyệt đối không để lộ ra ngoài Frontend)
   hashSecret: ${VNPAY_HASH_SECRET}
@@ -52,3 +52,4 @@ vnpay:
   # Đường link VNPay sẽ "đá" khách hàng về lại web của bạn sau khi quét mã QR xong
   # (Bạn sửa lại cổng 8080 nếu web của bạn chạy cổng khác nhé)
   returnUrl: http://localhost:8080/payments/vnpay-return
+

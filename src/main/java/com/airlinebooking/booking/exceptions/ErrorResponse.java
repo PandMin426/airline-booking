@@ -16,13 +16,14 @@ public class ErrorResponse {
     public ErrorResponse(ErrorCode errorCode){
         this.timestamp = LocalDateTime.now();
         this.code = errorCode.getCode();
-        messages.add(errorCode.getMessage());
+        this.messages = List.of(errorCode.getMessage());
     }
 
     public ErrorResponse(ErrorCode errorCode, String message){
         this.timestamp = LocalDateTime.now();
         this.code = errorCode.getCode();
-        this.messages.add(errorCode.getMessage());
+        this.messages = List.of(errorCode.getMessage());
+
     }
 
     public ErrorResponse(ErrorCode errorCode, List<String> messages){
