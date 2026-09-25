@@ -8,8 +8,10 @@ import com.airlinebooking.booking.payload.response.SeatResponse;
 import com.airlinebooking.booking.repository.SeatRepository;
 import com.airlinebooking.booking.service.RedisService;
 import com.airlinebooking.booking.service.SeatService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,24 +24,21 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class SeatServiceImp implements SeatService {
 
-    private static final long HELD_STATIC_SEAT_MAP = 15;
+    @Value("${booking.hold-minutes}")
+    private long holdMinutes = 15;
 
-    @Autowired
-    private SeatRepository seatRepository;
+    private final SeatRepository seatRepository;
 
-    @Autowired
-    private SeatMapper seatMapper;
+    private final SeatMapper seatMapper;
 
-    @Autowired
-    private RedisService redisService;
+    private final RedisService redisService;
 
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper;
 
     @Override
     public List<SeatResponse> getSeatMap(Integer flightId) {
@@ -124,7 +123,7 @@ public class SeatServiceImp implements SeatService {
 
                 // lưu kết quả lên redis
                 String jsonToCache = objectMapper.writeValueAsString(seatResponseList);
-                stringRedisTemplate.opsForValue().set(staticSeatMapKeys, jsonToCache, HELD_STATIC_SEAT_MAP, TimeUnit.MINUTES);
+                stringRedisTemplate.opsForValue().set(staticSeatMapKeys, jsonToCache, holdMinutes, TimeUnit.MINUTES);
             }
         } catch (Exception e) {
             throw new AppException(ErrorCode.REDIS_OPERATION_FAILED);

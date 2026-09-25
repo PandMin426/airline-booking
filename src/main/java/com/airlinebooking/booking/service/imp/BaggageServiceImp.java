@@ -5,20 +5,20 @@ import com.airlinebooking.booking.mapper.BaggageMapper;
 import com.airlinebooking.booking.payload.response.BaggageResponse;
 import com.airlinebooking.booking.repository.BaggageCatalogRepository;
 import com.airlinebooking.booking.service.BaggageService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@RequiredArgsConstructor
 @Service
 public class BaggageServiceImp implements BaggageService {
 
-    @Autowired
-    private BaggageCatalogRepository baggageCatalogRepository;
+    private final BaggageCatalogRepository baggageCatalogRepository;
 
-    @Autowired
-    private BaggageMapper baggageMapper;
+    private final BaggageMapper baggageMapper;
 
     @Override
     public List<BaggageResponse> getAllBaggages() {

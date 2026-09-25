@@ -10,6 +10,7 @@ import com.airlinebooking.booking.payload.response.PageResponse;
 import com.airlinebooking.booking.repository.FlightRepository;
 import com.airlinebooking.booking.service.FlightService;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,16 +19,15 @@ import org.springframework.stereotype.Service;
 import java.time.LocalTime;
 import java.util.List;
 
+@RequiredArgsConstructor
 @Service
 public class FlightServiceImp implements FlightService {
 
     private static final String NEED_SEARCH = "SCHEDULED";
 
-    @Autowired
-    private FlightRepository flightRepository;
+    private final FlightRepository flightRepository;
 
-    @Autowired
-    private FlightMapper flightMapper;
+    private final FlightMapper flightMapper;
 
     @Override
     public PageResponse<FlightSearchResponse> searchFlights(FlightSearchRequest flightSearchRequest, Pageable pageable) {
